@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>قارئ الشارت</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --bg:#EEF3F2;
+    --surface:#FFFFFF;
+    --surface-2:#F3F7F6;
+    --border:#DCE5E2;
+    --ink:#12181C;
+    --ink-soft:#4B5860;
+    --muted:#7C8A90;
+
+    --teal:#0E7C86;
+    --teal-soft:#E3F1F0;
+
+    --buy:#1E9457;
+    --buy-soft:#E6F5EC;
+    --sell:#D14343;
+    --sell-soft:#FBE9E9;
+    --warn:#B9791F;
+    --warn-soft:#FBF1E1;
+    --info:#3B6FA0;
+    --info-soft:#EAF1F8;
+
+    --shadow: 0 1px 2px rgba(18,24,28,.04), 0 8px 24px -12px rgba(18,24,28,.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0D1315; --surface:#151D20; --surface-2:#1A2226; --border:#283336;
+      --ink:#EDF2F2; --ink-soft:#B7C3C5; --muted:#7E8C90;
+      --teal:#39C4C6; --teal-soft:rgba(57,196,198,.13);
+      --buy:#41CE83; --buy-soft:rgba(65,206,131,.13);
+      --sell:#F0746B; --sell-soft:rgba(240,116,107,.13);
+      --warn:#E3A94B; --warn-soft:rgba(227,169,75,.13);
+      --info:#78ADDC; --info-soft:rgba(120,173,220,.13);
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0D1315; --surface:#151D20; --surface-2:#1A2226; --border:#283336;
+    --ink:#EDF2F2; --ink-soft:#B7C3C5; --muted:#7E8C90;
+    --teal:#39C4C6; --teal-soft:rgba(57,196,198,.13);
+    --buy:#41CE83; --buy-soft:rgba(65,206,131,.13);
+    --sell:#F0746B; --sell-soft:rgba(240,116,107,.13);
+    --warn:#E3A94B; --warn-soft:rgba(227,169,75,.13);
+    --info:#78ADDC; --info-soft:rgba(120,173,220,.13);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px -14px rgba(0,0,0,.6);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Tajawal','Segoe UI',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  @media (prefers-reduced-motion: reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important; } }
+
+  .wrap{ max-width:760px; margin:0 auto; padding:28px 18px 64px; }
+
+  .top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:18px; }
+  .top h1{ font-family:'Cairo',sans-serif; font-weight:800; font-size:1.3rem; margin:0; }
+  .top span{ font-size:.78rem; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+
+  /* upload panel */
+  .panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:18px;
+    box-shadow:var(--shadow); padding:20px; margin-bottom:20px;
+  }
+  .drop{
+    border:2px dashed var(--border); border-radius:14px;
+    padding:28px 16px; text-align:center; cursor:pointer;
+    transition:border-color .15s, background .15s;
+    color:var(--muted); font-size:.88rem;
+  }
+  .drop.drag{ border-color:var(--teal); background:var(--teal-soft); color:var(--ink-soft); }
+  .drop svg{ width:26px; height:26px; margin-bottom:8px; color:var(--muted); }
+  .drop b{ color:var(--ink); font-family:'Cairo',sans-serif; }
+  input[type=file]{ display:none; }
+
+  .preview-row{ display:none; align-items:center; gap:12px; margin-top:14px; }
+  .preview-row.show{ display:flex; }
+  .preview-row img{ width:56px; height:56px; object-fit:cover; border-radius:9px; border:1px solid var(--border); }
+  .preview-name{ flex:1; font-size:.83rem; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .actions{ display:flex; gap:10px; margin-top:16px; }
+  .btn{
+    font-family:'Cairo',sans-serif; font-weight:700; font-size:.9rem;
+    border:none; border-radius:11px; padding:11px 22px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px;
+    transition:opacity .15s, transform .1s;
+  }
+  .btn:active{ transform:scale(.98); }
+  .btn:disabled{ opacity:.55; cursor:default; }
+  .btn-primary{ background:var(--teal); color:#fff; }
+  .btn-ghost{ background:var(--surface-2); color:var(--ink-soft); border:1px solid var(--border); }
+
+  .spinner{
+    width:15px; height:15px; border-radius:50%;
+    border:2px solid rgba(255,255,255,.4); border-top-color:#fff;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .error-box{
+    display:none; margin-top:14px; padding:12px 14px; border-radius:10px;
+    background:var(--sell-soft); color:var(--sell); font-size:.85rem; line-height:1.7;
+  }
+  .error-box.show{ display:block; }
+
+  /* result card (same design language as the panel) */
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); overflow:hidden; display:none; }
+  .card.show{ display:block; }
+
+  .head{ display:flex; align-items:center; gap:14px; padding:22px 22px 18px; border-bottom:1px solid var(--border); }
+  .avatar{ width:46px; height:46px; border-radius:13px; background:linear-gradient(160deg, var(--teal), color-mix(in srgb, var(--teal) 55%, var(--ink))); color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Cairo',sans-serif; font-weight:800; font-size:1.15rem; flex:none; }
+  .head-text{ flex:1; min-width:0; }
+  .symbol{ font-family:'Cairo',sans-serif; font-weight:800; font-size:1.32rem; margin:0 0 3px; }
+  .tf{ font-family:'IBM Plex Mono',monospace; font-size:.78rem; color:var(--muted); }
+  .signal-pill{ flex:none; font-family:'Cairo',sans-serif; font-weight:700; font-size:.86rem; padding:7px 16px; border-radius:999px; }
+  .signal-buy{ color:var(--buy); background:var(--buy-soft); }
+  .signal-sell{ color:var(--sell); background:var(--sell-soft); }
+  .signal-neutral{ color:var(--warn); background:var(--warn-soft); }
+
+  .sec{ padding:20px 22px; border-bottom:1px solid var(--border); }
+  .sec:last-child{ border-bottom:none; }
+  .sec-title{ font-family:'Cairo',sans-serif; font-weight:700; font-size:.95rem; margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+  .sec-title .bar{ width:4px; height:15px; border-radius:2px; background:var(--teal); flex:none; }
+
+  .gauges{ display:flex; flex-direction:column; gap:14px; }
+  .gauge-row{ display:flex; align-items:center; gap:12px; }
+  .gauge-label{ width:98px; flex:none; font-size:.86rem; color:var(--ink-soft); }
+  .gauge-track{ position:relative; flex:1; height:9px; border-radius:5px; background:var(--surface-2); border:1px solid var(--border); overflow:hidden; }
+  .gauge-track::after{ content:""; position:absolute; inset:0; background-image:repeating-linear-gradient(90deg, transparent 0 9.9%, var(--border) 9.9% 10%); opacity:.7; }
+  .gauge-fill{ position:absolute; top:0; bottom:0; right:0; border-radius:5px; background:linear-gradient(90deg, color-mix(in srgb, var(--teal) 55%, transparent), var(--teal)); }
+  .gauge-val{ width:34px; flex:none; text-align:left; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:.9rem; }
+  .vol-row{ display:flex; align-items:center; gap:10px; margin-top:4px; }
+  .vol-label{ font-size:.86rem; color:var(--ink-soft); width:98px; flex:none; }
+  .vol-pill{ font-family:'IBM Plex Mono',monospace; font-size:.8rem; font-weight:600; padding:4px 12px; border-radius:7px; background:var(--warn-soft); color:var(--warn); }
+
+  .prose{ font-size:.92rem; line-height:1.85; color:var(--ink-soft); margin:0; }
+
+  .levels{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .levels-col h3{ margin:0 0 9px; font-size:.78rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-family:'Cairo',sans-serif; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{ font-family:'IBM Plex Mono',monospace; font-size:.84rem; font-weight:600; padding:6px 11px; border-radius:8px; }
+  .chip-support{ background:var(--buy-soft); color:var(--buy); }
+  .chip-resistance{ background:var(--sell-soft); color:var(--sell); }
+
+  .rec{ background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:16px 16px 14px; }
+  .rec + .rec{ margin-top:14px; }
+  .rec-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
+  .rec-term{ font-family:'Cairo',sans-serif; font-weight:700; font-size:.95rem; }
+  .rec-status{ font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--warn-soft); color:var(--warn); font-family:'Cairo',sans-serif; display:flex; align-items:center; gap:5px; }
+  .rec-status svg{ width:11px; height:11px; }
+  .rec-cond{ font-size:.86rem; color:var(--ink-soft); line-height:1.7; margin:0 0 13px; }
+  .rec-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:11px 8px; }
+  .rec-cell{ text-align:center; }
+  .rec-cell .k{ font-size:.72rem; color:var(--muted); margin-bottom:4px; }
+  .rec-cell .v{ font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:1rem; }
+  .v-entry{ color:var(--ink); }
+  .v-stop{ color:var(--sell); }
+  .v-target{ color:var(--buy); }
+  .rec-rationale{ font-size:.82rem; color:var(--muted); margin:11px 0 0; line-height:1.7; }
+
+  .summary-box{ background:var(--teal-soft); border-radius:12px; padding:15px 16px; font-size:.9rem; line-height:1.85; color:var(--ink-soft); }
+
+  .ilist{ display:flex; flex-direction:column; gap:10px; }
+  .irow{ display:flex; align-items:flex-start; gap:10px; }
+  .irow .ic{ flex:none; width:20px; height:20px; border-radius:6px; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  .irow .ic svg{ width:12px; height:12px; }
+  .irow p{ margin:0; font-size:.87rem; line-height:1.7; color:var(--ink-soft); }
+  .ic-buy{ background:var(--buy-soft); color:var(--buy); }
+  .ic-warn{ background:var(--warn-soft); color:var(--warn); }
+  .ic-info{ background:var(--info-soft); color:var(--info); }
+
+  .subblock{ margin-bottom:18px; }
+  .subblock:last-child{ margin-bottom:0; }
+  .subhead{ font-size:.82rem; font-weight:700; color:var(--ink-soft); margin:0 0 10px; font-family:'Cairo',sans-serif; }
+
+  .foot{ margin-top:18px; font-size:.78rem; line-height:1.8; color:var(--muted); padding:0 4px; }
+  .foot b{ color:var(--ink-soft); }
+
+  @media (max-width:480px){ .levels{ grid-template-columns:1fr; } .rec-grid{ gap:4px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>قارئ الشارت</h1>
+    <span>يشتغل محلياً · Claude API</span>
+  </div>
+
+  <div class="panel">
+    <div class="drop" id="drop">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
+      <div><b>اسحب صورة الشارت هون</b> أو دوس للاختيار</div>
+    </div>
+    <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp, image/gif">
+
+    <div class="preview-row" id="previewRow">
+      <img id="previewImg" alt="">
+      <span class="preview-name" id="previewName"></span>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="analyzeBtn" disabled>
+        <span id="analyzeLabel">حلّل الشارت</span>
+      </button>
+      <button class="btn btn-ghost" id="resetBtn">مسح</button>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <div class="card" id="card">
+    <div class="head">
+      <div class="avatar" id="avatar"></div>
+      <div class="head-text">
+        <p class="symbol" id="symbol"></p>
+        <span class="tf" id="tf"></span>
+      </div>
+      <span class="signal-pill" id="signalPill"></span>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>مؤشرات القراءة</p>
+      <div class="gauges">
+        <div class="gauge-row">
+          <span class="gauge-label">قوة الاتجاه</span>
+          <div class="gauge-track"><div class="gauge-fill" id="trendFill"></div></div>
+          <span class="gauge-val" id="trendVal"></span>
+        </div>
+        <div class="gauge-row">
+          <span class="gauge-label">الزخم</span>
+          <div class="gauge-track"><div class="gauge-fill" id="momFill"></div></div>
+          <span class="gauge-val" id="momVal"></span>
+        </div>
+        <div class="vol-row">
+          <span class="vol-label">التقلّب</span>
+          <span class="vol-pill" id="volVal"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>حركة السعر</p>
+      <p class="prose" id="priceAction"></p>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>الدعم والمقاومة</p>
+      <div class="levels">
+        <div class="levels-col"><h3>دعم</h3><div class="chip-row" id="supportChips"></div></div>
+        <div class="levels-col"><h3>مقاومة</h3><div class="chip-row" id="resistanceChips"></div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>التوصيات</p>
+      <div id="recList"></div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>الملخص</p>
+      <div class="summary-box" id="summaryBox"></div>
+    </div>
+
+    <div class="sec">
+      <div class="subblock"><p class="subhead">نقاط القوة</p><div class="ilist" id="strengthsList"></div></div>
+      <div class="subblock"><p class="subhead">المخاطر</p><div class="ilist" id="risksList"></div></div>
+      <div class="subblock"><p class="subhead">إدارة المخاطر</p><div class="ilist" id="mgmtList"></div></div>
+      <div class="subblock"><p class="subhead">نقاط إضافية</p><div class="ilist" id="notesList"></div></div>
+    </div>
+  </div>
+
+  <p class="foot">
+    <b>ملاحظة:</b> التحليل ناتج عن قراءة بصرية لصورة الشارت بواسطة Claude، مش من بيانات سعر حية أو حسابات مؤشرات دقيقة —
+    ممكن تختلف الأرقام عن الواقع. مش توصية استثمارية، وما بيغني عن التأكد من مصدر بيانات حقيقي قبل أي قرار تداول.
+  </p>
+</div>
+
+<script>
+(function(){
+  var ICONS = {
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    warn:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.5 18a1.8 1.8 0 0 0 1.6 2.6h15.8a1.8 1.8 0 0 0 1.6-2.6L13.7 3.9a1.7 1.7 0 0 0-3.4 0Z"/></svg>',
+    shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v6c0 5 3.4 8 7.5 9 4.1-1 7.5-4 7.5-9V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg>',
+    info:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+  };
+
+  var drop = document.getElementById('drop');
+  var fileInput = document.getElementById('fileInput');
+  var previewRow = document.getElementById('previewRow');
+  var previewImg = document.getElementById('previewImg');
+  var previewName = document.getElementById('previewName');
+  var analyzeBtn = document.getElementById('analyzeBtn');
+  var analyzeLabel = document.getElementById('analyzeLabel');
+  var resetBtn = document.getElementById('resetBtn');
+  var errorBox = document.getElementById('errorBox');
+  var card = document.getElementById('card');
+
+  var currentFile = null;
+
+  function showError(msg){
+    errorBox.textContent = msg;
+    errorBox.classList.add('show');
+  }
+  function clearError(){
+    errorBox.classList.remove('show');
+    errorBox.textContent = '';
+  }
+
+  function setFile(file){
+    if(!file) return;
+    if(!/^image\/(png|jpeg|jpg|webp|gif)$/.test(file.type)){
+      showError('صيغة غير مدعومة — استخدم PNG أو JPEG أو WEBP.');
+      return;
+    }
+    clearError();
+    currentFile = file;
+    previewImg.src = URL.createObjectURL(file);
+    previewName.textContent = file.name;
+    previewRow.classList.add('show');
+    analyzeBtn.disabled = false;
+  }
+
+  drop.addEventListener('click', function(){ fileInput.click(); });
+  drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', function(){ drop.classList.remove('drag'); });
+  drop.addEventListener('drop', function(e){
+    e.preventDefault();
+    drop.classList.remove('drag');
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', function(){
+    if(fileInput.files && fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  resetBtn.addEventListener('click', function(){
+    currentFile = null;
+    fileInput.value = '';
+    previewRow.classList.remove('show');
+    analyzeBtn.disabled = true;
+    clearError();
+    card.classList.remove('show');
+  });
+
+  analyzeBtn.addEventListener('click', function(){
+    if(!currentFile) return;
+    clearError();
+    card.classList.remove('show');
+    analyzeBtn.disabled = true;
+    analyzeLabel.innerHTML = '<span class="spinner"></span> عم يحلل...';
+
+    var formData = new FormData();
+    formData.append('image', currentFile);
+
+    fetch('/api/analyze', { method: 'POST', body: formData })
+      .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
+      .then(function(result){
+        if(!result.ok || result.data.error){
+          showError(result.data.error || 'صار في مشكلة، جرب مرة ثانية.');
+          return;
+        }
+        render(result.data);
+        card.classList.add('show');
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      })
+      .catch(function(){
+        showError('ما قدرنا نوصل للسيرفر المحلي — تأكد إنه التطبيق شغال.');
+      })
+      .finally(function(){
+        analyzeBtn.disabled = false;
+        analyzeLabel.textContent = 'حلّل الشارت';
+      });
+  });
+
+  function el(tag, cls, html){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(html !== undefined) e.innerHTML = html;
+    return e;
+  }
+  function fmt(n){
+    if(typeof n !== 'number') return n;
+    return n.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+  }
+  function clearChildren(node){ while(node.firstChild) node.removeChild(node.firstChild); }
+
+  function render(d){
+    document.getElementById('symbol').textContent = d.symbol || '—';
+    document.getElementById('tf').textContent = 'فريم ' + (d.timeframe || '—');
+    document.getElementById('avatar').textContent = d.symbolShort || (d.symbol ? d.symbol[0] : '?');
+
+    var pill = document.getElementById('signalPill');
+    pill.textContent = d.signalLabel || '—';
+    pill.className = 'signal-pill signal-' + (d.signal || 'neutral');
+
+    var trend = Number(d.trendStrength) || 0;
+    var mom = Number(d.momentum) || 0;
+    document.getElementById('trendFill').style.width = trend + '%';
+    document.getElementById('trendVal').textContent = trend;
+    document.getElementById('momFill').style.width = mom + '%';
+    document.getElementById('momVal').textContent = mom;
+    document.getElementById('volVal').textContent = d.volatility || '—';
+
+    document.getElementById('priceAction').textContent = d.priceAction || '';
+    document.getElementById('summaryBox').textContent = d.summary || '';
+
+    var supWrap = document.getElementById('supportChips'); clearChildren(supWrap);
+    (d.support || []).slice().sort(function(a,b){return b-a;}).forEach(function(v){
+      supWrap.appendChild(el('span', 'chip chip-support', fmt(v)));
+    });
+    var resWrap = document.getElementById('resistanceChips'); clearChildren(resWrap);
+    (d.resistance || []).slice().sort(function(a,b){return a-b;}).forEach(function(v){
+      resWrap.appendChild(el('span', 'chip chip-resistance', fmt(v)));
+    });
+
+    var recWrap = document.getElementById('recList'); clearChildren(recWrap);
+    (d.recommendations || []).forEach(function(r){
+      var c = el('div', 'rec');
+      c.appendChild(el('div', 'rec-head',
+        '<span class="rec-term">' + (r.term || '') + '</span>' +
+        '<span class="rec-status">' + ICONS.clock + 'أمر معلّق</span>'
+      ));
+      c.appendChild(el('p', 'rec-cond', r.condition || ''));
+      c.appendChild(el('div', 'rec-grid',
+        '<div class="rec-cell"><div class="k">الدخول</div><div class="v v-entry">' + fmt(r.entry) + '</div></div>' +
+        '<div class="rec-cell"><div class="k">وقف الخسارة</div><div class="v v-stop">' + fmt(r.stop) + '</div></div>' +
+        '<div class="rec-cell"><div class="k">جني الربح</div><div class="v v-target">' + fmt(r.target) + '</div></div>'
+      ));
+      c.appendChild(el('p', 'rec-rationale', r.rationale || ''));
+      recWrap.appendChild(c);
+    });
+
+    function fillList(id, items, iconClass, icon){
+      var wrap = document.getElementById(id); clearChildren(wrap);
+      (items || []).forEach(function(t){
+        var row = el('div', 'irow');
+        row.appendChild(el('span', 'ic ' + iconClass, icon));
+        row.appendChild(el('p', null, t));
+        wrap.appendChild(row);
+      });
+    }
+    fillList('strengthsList', d.strengths, 'ic-buy', ICONS.check);
+    fillList('risksList', d.risks, 'ic-warn', ICONS.warn);
+    fillList('mgmtList', d.riskManagement, 'ic-info', ICONS.shield);
+    fillList('notesList', d.notes, 'ic-info', ICONS.info);
+  }
+})();
+</script>
+</body>
+</html>
