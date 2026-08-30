@@ -1,0 +1,17 @@
+{
+  "name": "قارئ الشارت",
+  "short_name": "قارئ الشارت",
+  "description": "تحليل فني لصور شارتات التداول بالذكاء الاصطناعي",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D1315",
+  "theme_color": "#0E7C86",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
