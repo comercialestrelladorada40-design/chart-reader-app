@@ -218,17 +218,21 @@ def analyze():
 
     client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
+    # وضع الفريمين بيحتاج رد أطول (شرح فريمين + مواءمة بينهم)، فبنزود سقف الطول
+    # مشان ما ينقطع الـ JSON قبل ما يكمل.
+    max_out_tokens = 3600 if is_mtfa else 2200
+
     try:
         response = client.messages.create(
             model=MODEL,
-            max_tokens=2200,
+            max_tokens=max_out_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": content}],
         )
         raw_text = "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
         data = extract_json(raw_text)
     except json.JSONDecodeError:
-        return jsonify({"error": "الرد ما كان JSON صالح — جرب صورة أوضح أو حاول مرة ثانية."}), 502
+        return jsonify({"error": "الرد انقطع قبل ما يكمل — جرب مرة ثانية (أو صورة أوضح إذا تكرر الموضوع)."}), 502
     except Exception as exc:  # noqa: BLE001 — نرجع رسالة مفهومة للواجهة
         return jsonify({"error": f"صار خطأ بالاتصال مع Claude API: {exc}"}), 502
 
