@@ -81,21 +81,34 @@
     background:var(--surface); border:1px solid var(--border); border-radius:18px;
     box-shadow:var(--shadow); padding:20px; margin-bottom:20px;
   }
+  .upload-group{ margin-bottom:16px; }
+  .upload-group:last-of-type{ margin-bottom:0; }
+  .upload-label{
+    font-family:'Cairo',sans-serif; font-weight:700; font-size:.86rem;
+    color:var(--ink); margin:0 0 8px; display:flex; align-items:baseline; gap:6px; flex-wrap:wrap;
+  }
+  .upload-hint{ font-family:'Tajawal',sans-serif; font-weight:400; font-size:.78rem; color:var(--muted); }
+  .upload-note{ font-size:.78rem; color:var(--muted); margin:14px 0 0; line-height:1.7; }
+
   .drop{
     border:2px dashed var(--border); border-radius:14px;
-    padding:28px 16px; text-align:center; cursor:pointer;
+    padding:20px 16px; text-align:center; cursor:pointer;
     transition:border-color .15s, background .15s;
-    color:var(--muted); font-size:.88rem;
+    color:var(--muted); font-size:.86rem;
   }
   .drop.drag{ border-color:var(--teal); background:var(--teal-soft); color:var(--ink-soft); }
-  .drop svg{ width:26px; height:26px; margin-bottom:8px; color:var(--muted); }
+  .drop svg{ width:24px; height:24px; margin-bottom:6px; color:var(--muted); }
   .drop b{ color:var(--ink); font-family:'Cairo',sans-serif; }
   input[type=file]{ display:none; }
 
-  .preview-row{ display:none; align-items:center; gap:12px; margin-top:14px; }
+  .preview-row{ display:none; align-items:center; gap:12px; margin-top:12px; }
   .preview-row.show{ display:flex; }
-  .preview-row img{ width:56px; height:56px; object-fit:cover; border-radius:9px; border:1px solid var(--border); }
+  .preview-row img{ width:52px; height:52px; object-fit:cover; border-radius:9px; border:1px solid var(--border); }
   .preview-name{ flex:1; font-size:.83rem; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip-remove{
+    flex:none; width:26px; height:26px; border-radius:8px; border:1px solid var(--border);
+    background:var(--surface-2); color:var(--ink-soft); font-size:1rem; line-height:1; cursor:pointer;
+  }
 
   .actions{ display:flex; gap:10px; margin-top:16px; }
   .btn{
@@ -178,6 +191,9 @@
   .rec-rationale{ font-size:.82rem; color:var(--muted); margin:11px 0 0; line-height:1.7; }
 
   .summary-box{ background:var(--teal-soft); border-radius:12px; padding:15px 16px; font-size:.9rem; line-height:1.85; color:var(--ink-soft); }
+  .align-box{ border-radius:12px; padding:15px 16px; font-size:.9rem; line-height:1.85; }
+  .align-ok{ background:var(--buy-soft); color:var(--buy); }
+  .align-bad{ background:var(--warn-soft); color:var(--warn); }
 
   .ilist{ display:flex; flex-direction:column; gap:10px; }
   .irow{ display:flex; align-items:flex-start; gap:10px; }
@@ -206,16 +222,35 @@
   </div>
 
   <div class="panel">
-    <div class="drop" id="drop">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
-      <div><b>اسحب صورة الشارت هون</b> أو دوس للاختيار</div>
+    <div class="upload-group">
+      <p class="upload-label">فريم 15 دقيقة <span class="upload-hint">(الاتجاه العام — البوصلة)</span></p>
+      <div class="drop" id="drop15">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
+        <div><b>اسحب صورة فريم 15 دقيقة هون</b> أو دوس للاختيار</div>
+      </div>
+      <input type="file" id="fileInput15" accept="image/png, image/jpeg, image/webp, image/gif">
+      <div class="preview-row" id="previewRow15">
+        <img id="previewImg15" alt="">
+        <span class="preview-name" id="previewName15"></span>
+        <button class="chip-remove" id="removeBtn15" type="button" aria-label="حذف">×</button>
+      </div>
     </div>
-    <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp, image/gif">
 
-    <div class="preview-row" id="previewRow">
-      <img id="previewImg" alt="">
-      <span class="preview-name" id="previewName"></span>
+    <div class="upload-group">
+      <p class="upload-label">فريم 5 دقايق <span class="upload-hint">(نقطة الدخول — الزناد)</span></p>
+      <div class="drop" id="drop5">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
+        <div><b>اسحب صورة فريم 5 دقايق هون</b> أو دوس للاختيار</div>
+      </div>
+      <input type="file" id="fileInput5" accept="image/png, image/jpeg, image/webp, image/gif">
+      <div class="preview-row" id="previewRow5">
+        <img id="previewImg5" alt="">
+        <span class="preview-name" id="previewName5"></span>
+        <button class="chip-remove" id="removeBtn5" type="button" aria-label="حذف">×</button>
+      </div>
     </div>
+
+    <p class="upload-note">ارفع الصورتين مع بعض لتحليل متعدد الفريمات (الأدق)، أو صورة وحدة بس لتحليل فريم مفرد.</p>
 
     <div class="actions">
       <button class="btn btn-primary" id="analyzeBtn" disabled>
@@ -262,6 +297,11 @@
       <p class="prose" id="priceAction"></p>
     </div>
 
+    <div class="sec" id="alignmentSec">
+      <p class="sec-title"><span class="bar"></span>المواءمة بين الفريمين</p>
+      <div class="align-box" id="alignmentBox"></div>
+    </div>
+
     <div class="sec">
       <p class="sec-title"><span class="bar"></span>الدعم والمقاومة</p>
       <div class="levels">
@@ -289,7 +329,7 @@
   </div>
 
   <p class="foot">
-    <b>ملاحظة:</b> التحليل ناتج عن قراءة بصرية لصورة الشارت بواسطة Claude، مش من بيانات سعر حية أو حسابات مؤشرات دقيقة —
+    <b>ملاحظة:</b> التحليل ناتج عن قراءة بصرية لصورة (أو صورتين) الشارت بواسطة Claude، مش من بيانات سعر حية أو حسابات مؤشرات دقيقة —
     ممكن تختلف الأرقام عن الواقع. مش توصية استثمارية، وما بيغني عن التأكد من مصدر بيانات حقيقي قبل أي قرار تداول.
   </p>
 </div>
@@ -304,18 +344,34 @@
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
   };
 
-  var drop = document.getElementById('drop');
-  var fileInput = document.getElementById('fileInput');
-  var previewRow = document.getElementById('previewRow');
-  var previewImg = document.getElementById('previewImg');
-  var previewName = document.getElementById('previewName');
   var analyzeBtn = document.getElementById('analyzeBtn');
   var analyzeLabel = document.getElementById('analyzeLabel');
   var resetBtn = document.getElementById('resetBtn');
   var errorBox = document.getElementById('errorBox');
   var card = document.getElementById('card');
 
-  var currentFile = null;
+  var slots = {
+    '15': {
+      drop: document.getElementById('drop15'),
+      input: document.getElementById('fileInput15'),
+      row: document.getElementById('previewRow15'),
+      img: document.getElementById('previewImg15'),
+      name: document.getElementById('previewName15'),
+      remove: document.getElementById('removeBtn15'),
+      field: 'image_15m',
+      file: null
+    },
+    '5': {
+      drop: document.getElementById('drop5'),
+      input: document.getElementById('fileInput5'),
+      row: document.getElementById('previewRow5'),
+      img: document.getElementById('previewImg5'),
+      name: document.getElementById('previewName5'),
+      remove: document.getElementById('removeBtn5'),
+      field: 'image_5m',
+      file: null
+    }
+  };
 
   function showError(msg){
     errorBox.textContent = msg;
@@ -326,50 +382,69 @@
     errorBox.textContent = '';
   }
 
-  function setFile(file){
+  function updateAnalyzeState(){
+    analyzeBtn.disabled = !(slots['15'].file || slots['5'].file);
+  }
+
+  function setSlotFile(key, file){
     if(!file) return;
     if(!/^image\/(png|jpeg|jpg|webp|gif)$/.test(file.type)){
       showError('صيغة غير مدعومة — استخدم PNG أو JPEG أو WEBP.');
       return;
     }
     clearError();
-    currentFile = file;
-    previewImg.src = URL.createObjectURL(file);
-    previewName.textContent = file.name;
-    previewRow.classList.add('show');
-    analyzeBtn.disabled = false;
+    var s = slots[key];
+    s.file = file;
+    s.img.src = URL.createObjectURL(file);
+    s.name.textContent = file.name;
+    s.row.classList.add('show');
+    updateAnalyzeState();
   }
 
-  drop.addEventListener('click', function(){ fileInput.click(); });
-  drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('drag'); });
-  drop.addEventListener('dragleave', function(){ drop.classList.remove('drag'); });
-  drop.addEventListener('drop', function(e){
-    e.preventDefault();
-    drop.classList.remove('drag');
-    if(e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
-  });
-  fileInput.addEventListener('change', function(){
-    if(fileInput.files && fileInput.files[0]) setFile(fileInput.files[0]);
+  function clearSlot(key){
+    var s = slots[key];
+    s.file = null;
+    s.input.value = '';
+    s.row.classList.remove('show');
+    updateAnalyzeState();
+  }
+
+  Object.keys(slots).forEach(function(key){
+    var s = slots[key];
+    s.drop.addEventListener('click', function(){ s.input.click(); });
+    s.drop.addEventListener('dragover', function(e){ e.preventDefault(); s.drop.classList.add('drag'); });
+    s.drop.addEventListener('dragleave', function(){ s.drop.classList.remove('drag'); });
+    s.drop.addEventListener('drop', function(e){
+      e.preventDefault();
+      s.drop.classList.remove('drag');
+      if(e.dataTransfer.files && e.dataTransfer.files[0]) setSlotFile(key, e.dataTransfer.files[0]);
+    });
+    s.input.addEventListener('change', function(){
+      if(s.input.files && s.input.files[0]) setSlotFile(key, s.input.files[0]);
+    });
+    s.remove.addEventListener('click', function(e){
+      e.stopPropagation();
+      clearSlot(key);
+    });
   });
 
   resetBtn.addEventListener('click', function(){
-    currentFile = null;
-    fileInput.value = '';
-    previewRow.classList.remove('show');
-    analyzeBtn.disabled = true;
+    clearSlot('15');
+    clearSlot('5');
     clearError();
     card.classList.remove('show');
   });
 
   analyzeBtn.addEventListener('click', function(){
-    if(!currentFile) return;
+    if(!slots['15'].file && !slots['5'].file) return;
     clearError();
     card.classList.remove('show');
     analyzeBtn.disabled = true;
     analyzeLabel.innerHTML = '<span class="spinner"></span> عم يحلل...';
 
     var formData = new FormData();
-    formData.append('image', currentFile);
+    if(slots['15'].file) formData.append('image_15m', slots['15'].file);
+    if(slots['5'].file) formData.append('image_5m', slots['5'].file);
 
     fetch('/api/analyze', { method: 'POST', body: formData })
       .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
@@ -386,7 +461,7 @@
         showError('ما قدرنا نوصل للسيرفر المحلي — تأكد إنه التطبيق شغال.');
       })
       .finally(function(){
-        analyzeBtn.disabled = false;
+        updateAnalyzeState();
         analyzeLabel.textContent = 'حلّل الشارت';
       });
   });
@@ -422,6 +497,16 @@
 
     document.getElementById('priceAction').textContent = d.priceAction || '';
     document.getElementById('summaryBox').textContent = d.summary || '';
+
+    var alignSec = document.getElementById('alignmentSec');
+    if(d.alignmentNote){
+      var alignBox = document.getElementById('alignmentBox');
+      alignBox.textContent = d.alignmentNote;
+      alignBox.className = 'align-box ' + (d.signal === 'neutral' ? 'align-bad' : 'align-ok');
+      alignSec.style.display = '';
+    } else {
+      alignSec.style.display = 'none';
+    }
 
     var supWrap = document.getElementById('supportChips'); clearChildren(supWrap);
     (d.support || []).slice().sort(function(a,b){return b-a;}).forEach(function(v){
