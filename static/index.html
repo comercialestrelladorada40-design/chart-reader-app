@@ -548,6 +548,14 @@
     fillList('mgmtList', d.riskManagement, 'ic-info', ICONS.shield);
     fillList('notesList', d.notes, 'ic-info', ICONS.info);
   }
+
+  // تسجيل الـ Service Worker — شرط أساسي مشان كروم عالأندرويد يعرض تلقائياً
+  // خيار "تثبيت التطبيق" (نافذة مستقلة + أيقونة عالشاشة الرئيسية).
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('/sw.js').catch(function(){});
+    });
+  }
 })();
 </script>
 </body>
