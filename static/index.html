@@ -211,7 +211,37 @@
   .foot{ margin-top:18px; font-size:.78rem; line-height:1.8; color:var(--muted); padding:0 4px; }
   .foot b{ color:var(--ink-soft); }
 
-  @media (max-width:480px){ .levels{ grid-template-columns:1fr; } .rec-grid{ gap:4px; } }
+  /* تبويبات الوضع (تحليل الدخول / تحليل صفقة مفتوحة) */
+  .tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .tab-btn{
+    flex:1; font-family:'Cairo',sans-serif; font-weight:700; font-size:.85rem;
+    padding:11px 10px; border-radius:12px; border:1px solid var(--border);
+    background:var(--surface); color:var(--ink-soft); cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .tab-btn.active{ background:var(--teal); border-color:var(--teal); color:#fff; }
+  .mode-panel{ display:none; }
+  .mode-panel.active{ display:block; }
+
+  /* بطاقة تحليل صفقة مفتوحة */
+  .trade-card{ background:var(--surface); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); overflow:hidden; margin-bottom:16px; }
+  .trade-card:last-child{ margin-bottom:0; }
+  .trade-head{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:20px 22px 16px; border-bottom:1px solid var(--border); }
+  .trade-symbol{ font-family:'Cairo',sans-serif; font-weight:800; font-size:1.12rem; margin:0; }
+  .trade-size{ font-size:.78rem; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+  .trade-pnl{ margin-inline-start:auto; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:1.05rem; }
+  .pnl-pos{ color:var(--buy); }
+  .pnl-neg{ color:var(--sell); }
+
+  .rec-grid-4{ grid-template-columns:1fr 1fr 1fr 1fr; }
+  .chip-neutral{ background:var(--info-soft); color:var(--info); }
+
+  .reco-badge{ display:inline-block; font-family:'Cairo',sans-serif; font-weight:700; font-size:.85rem; padding:6px 14px; border-radius:999px; margin-bottom:10px; }
+  .reco-hold, .reco-trail{ background:var(--info-soft); color:var(--info); }
+  .reco-move_to_breakeven, .reco-partial_close{ background:var(--warn-soft); color:var(--warn); }
+  .reco-close{ background:var(--sell-soft); color:var(--sell); }
+
+  @media (max-width:480px){ .levels{ grid-template-columns:1fr; } .rec-grid{ gap:4px; } .rec-grid-4{ grid-template-columns:1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -221,6 +251,12 @@
     <span>يشتغل محلياً · Claude API</span>
   </div>
 
+  <div class="tabs">
+    <button class="tab-btn active" id="tabEntryBtn" type="button">تحليل الدخول</button>
+    <button class="tab-btn" id="tabTradeBtn" type="button">تحليل صفقة مفتوحة</button>
+  </div>
+
+  <div class="mode-panel active" id="modeEntry">
   <div class="panel">
     <div class="upload-group">
       <p class="upload-label">فريم 15 دقيقة <span class="upload-hint">(الاتجاه العام — البوصلة)</span></p>
@@ -326,6 +362,38 @@
       <div class="subblock"><p class="subhead">إدارة المخاطر</p><div class="ilist" id="mgmtList"></div></div>
       <div class="subblock"><p class="subhead">نقاط إضافية</p><div class="ilist" id="notesList"></div></div>
     </div>
+  </div>
+  </div>
+
+  <div class="mode-panel" id="modeTrade">
+    <div class="panel">
+      <div class="upload-group">
+        <p class="upload-label">صورة الصفقة المفتوحة</p>
+        <div class="drop" id="dropTrade">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
+          <div><b>اسحب صورة الصفقة هون</b> أو دوس للاختيار</div>
+        </div>
+        <input type="file" id="fileInputTrade" accept="image/png, image/jpeg, image/webp, image/gif">
+        <div class="preview-row" id="previewRowTrade">
+          <img id="previewImgTrade" alt="">
+          <span class="preview-name" id="previewNameTrade"></span>
+          <button class="chip-remove" id="removeBtnTrade" type="button" aria-label="حذف">×</button>
+        </div>
+      </div>
+
+      <p class="upload-note">لازم يكون صندوق تفاصيل الصفقة (السعر، الستوب، التي بي، الربح/الخسارة العائمة) ظاهر بالصورة مش بس الشارت. لو عندك أكتر من صفقة مفتوحة بنفس اللقطة، صورة وحدة كافية وبيحللهم كلهم.</p>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="analyzeTradeBtn" disabled>
+          <span id="analyzeTradeLabel">حلّل الصفقة</span>
+        </button>
+        <button class="btn btn-ghost" id="resetTradeBtn">مسح</button>
+      </div>
+
+      <div class="error-box" id="errorBoxTrade"></div>
+    </div>
+
+    <div id="tradeResults"></div>
   </div>
 
   <p class="foot">
@@ -547,6 +615,194 @@
     fillList('risksList', d.risks, 'ic-warn', ICONS.warn);
     fillList('mgmtList', d.riskManagement, 'ic-info', ICONS.shield);
     fillList('notesList', d.notes, 'ic-info', ICONS.info);
+  }
+
+  // ===== تبديل التبويبات (تحليل الدخول / تحليل صفقة مفتوحة) =====
+  var tabEntryBtn = document.getElementById('tabEntryBtn');
+  var tabTradeBtn = document.getElementById('tabTradeBtn');
+  var modeEntry = document.getElementById('modeEntry');
+  var modeTrade = document.getElementById('modeTrade');
+
+  tabEntryBtn.addEventListener('click', function(){
+    tabEntryBtn.classList.add('active');
+    tabTradeBtn.classList.remove('active');
+    modeEntry.classList.add('active');
+    modeTrade.classList.remove('active');
+  });
+  tabTradeBtn.addEventListener('click', function(){
+    tabTradeBtn.classList.add('active');
+    tabEntryBtn.classList.remove('active');
+    modeTrade.classList.add('active');
+    modeEntry.classList.remove('active');
+  });
+
+  // ===== وضع تحليل الصفقة المفتوحة =====
+  var tradeFile = null;
+  var dropTrade = document.getElementById('dropTrade');
+  var fileInputTrade = document.getElementById('fileInputTrade');
+  var previewRowTrade = document.getElementById('previewRowTrade');
+  var previewImgTrade = document.getElementById('previewImgTrade');
+  var previewNameTrade = document.getElementById('previewNameTrade');
+  var removeBtnTrade = document.getElementById('removeBtnTrade');
+  var analyzeTradeBtn = document.getElementById('analyzeTradeBtn');
+  var analyzeTradeLabel = document.getElementById('analyzeTradeLabel');
+  var resetTradeBtn = document.getElementById('resetTradeBtn');
+  var errorBoxTrade = document.getElementById('errorBoxTrade');
+  var tradeResults = document.getElementById('tradeResults');
+
+  function showTradeError(msg){
+    errorBoxTrade.textContent = msg;
+    errorBoxTrade.classList.add('show');
+  }
+  function clearTradeError(){
+    errorBoxTrade.classList.remove('show');
+    errorBoxTrade.textContent = '';
+  }
+
+  function setTradeFile(file){
+    if(!file) return;
+    if(!/^image\/(png|jpeg|jpg|webp|gif)$/.test(file.type)){
+      showTradeError('صيغة غير مدعومة — استخدم PNG أو JPEG أو WEBP.');
+      return;
+    }
+    clearTradeError();
+    tradeFile = file;
+    previewImgTrade.src = URL.createObjectURL(file);
+    previewNameTrade.textContent = file.name;
+    previewRowTrade.classList.add('show');
+    analyzeTradeBtn.disabled = false;
+  }
+  function clearTradeFile(){
+    tradeFile = null;
+    fileInputTrade.value = '';
+    previewRowTrade.classList.remove('show');
+    analyzeTradeBtn.disabled = true;
+  }
+
+  dropTrade.addEventListener('click', function(){ fileInputTrade.click(); });
+  dropTrade.addEventListener('dragover', function(e){ e.preventDefault(); dropTrade.classList.add('drag'); });
+  dropTrade.addEventListener('dragleave', function(){ dropTrade.classList.remove('drag'); });
+  dropTrade.addEventListener('drop', function(e){
+    e.preventDefault();
+    dropTrade.classList.remove('drag');
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) setTradeFile(e.dataTransfer.files[0]);
+  });
+  fileInputTrade.addEventListener('change', function(){
+    if(fileInputTrade.files && fileInputTrade.files[0]) setTradeFile(fileInputTrade.files[0]);
+  });
+  removeBtnTrade.addEventListener('click', function(e){
+    e.stopPropagation();
+    clearTradeFile();
+  });
+
+  resetTradeBtn.addEventListener('click', function(){
+    clearTradeFile();
+    clearTradeError();
+    clearChildren(tradeResults);
+  });
+
+  analyzeTradeBtn.addEventListener('click', function(){
+    if(!tradeFile) return;
+    clearTradeError();
+    clearChildren(tradeResults);
+    analyzeTradeBtn.disabled = true;
+    analyzeTradeLabel.innerHTML = '<span class="spinner"></span> عم يحلل...';
+
+    var formData = new FormData();
+    formData.append('image', tradeFile);
+
+    fetch('/api/analyze-trade', { method: 'POST', body: formData })
+      .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
+      .then(function(result){
+        if(!result.ok || result.data.error){
+          showTradeError(result.data.error || 'صار في مشكلة، جرب مرة ثانية.');
+          return;
+        }
+        renderTrades(result.data.trades || []);
+      })
+      .catch(function(){
+        showTradeError('ما قدرنا نوصل للسيرفر — تأكد إنه التطبيق شغال.');
+      })
+      .finally(function(){
+        analyzeTradeBtn.disabled = false;
+        analyzeTradeLabel.textContent = 'حلّل الصفقة';
+      });
+  });
+
+  var RECO_LABELS = {
+    hold: 'استمر بالصفقة',
+    move_to_breakeven: 'حرّك الستوب لنقطة الدخول',
+    trail: 'فعّل تريلنغ ستوب',
+    partial_close: 'اقفل جزء وخلي الباقي',
+    close: 'اقفل الصفقة'
+  };
+
+  function renderTrades(trades){
+    clearChildren(tradeResults);
+    if(!trades.length){
+      showTradeError('ما قدرنا نلاقي صفقة واضحة بالصورة — جرب صورة أوضح فيها صندوق تفاصيل الصفقة.');
+      return;
+    }
+    trades.forEach(function(t){
+      var card = el('div', 'trade-card');
+
+      var hasPnl = typeof t.floatingPnl === 'number';
+      var pnlClass = hasPnl && t.floatingPnl < 0 ? 'pnl-neg' : 'pnl-pos';
+      var pnlText = hasPnl ? (t.floatingPnl >= 0 ? '+' : '') + fmt(t.floatingPnl) + ' $' : '—';
+
+      card.appendChild(el('div', 'trade-head',
+        '<span class="signal-pill signal-' + (t.direction === 'buy' ? 'buy' : 'sell') + '">' + (t.directionLabel || '') + '</span>' +
+        '<span class="trade-symbol">' + (t.symbol || '—') + '</span>' +
+        (t.size != null ? '<span class="trade-size">' + fmt(t.size) + ' لوت</span>' : '') +
+        '<span class="trade-pnl ' + pnlClass + '">' + pnlText + '</span>'
+      ));
+
+      if(t.statusHeadline){
+        var statusSec = el('div', 'sec');
+        statusSec.appendChild(el('div', 'summary-box', t.statusHeadline));
+        card.appendChild(statusSec);
+      }
+
+      var numsSec = el('div', 'sec');
+      numsSec.appendChild(el('div', 'rec-grid rec-grid-4',
+        '<div class="rec-cell"><div class="k">الدخول</div><div class="v v-entry">' + fmt(t.entryPrice) + '</div></div>' +
+        '<div class="rec-cell"><div class="k">الحالي</div><div class="v v-entry">' + fmt(t.currentPrice) + '</div></div>' +
+        '<div class="rec-cell"><div class="k">الستوب</div><div class="v v-stop">' + fmt(t.stopLoss) + '</div></div>' +
+        '<div class="rec-cell"><div class="k">الهدف</div><div class="v v-target">' + (t.takeProfit != null ? fmt(t.takeProfit) : 'غير محدد') + '</div></div>'
+      ));
+      card.appendChild(numsSec);
+
+      var chipsSec = el('div', 'sec');
+      var chipsRow = el('div', 'chip-row');
+      if(t.distanceToStop != null) chipsRow.appendChild(el('span', 'chip chip-resistance', 'للستوب: ' + fmt(t.distanceToStop)));
+      if(t.distanceToTarget != null) chipsRow.appendChild(el('span', 'chip chip-support', 'للهدف: ' + fmt(t.distanceToTarget)));
+      if(t.riskRewardNow != null) chipsRow.appendChild(el('span', 'chip chip-neutral', 'العائد للمخاطرة الحالي: ' + fmt(t.riskRewardNow)));
+      if(t.pctToTarget != null) chipsRow.appendChild(el('span', 'chip chip-neutral', 'تحقق من الهدف: ' + fmt(t.pctToTarget) + '%'));
+      chipsSec.appendChild(chipsRow);
+      card.appendChild(chipsSec);
+
+      var recoSec = el('div', 'sec');
+      recoSec.appendChild(el('span', 'reco-badge reco-' + (t.recommendation || 'hold'), t.recommendationLabel || RECO_LABELS[t.recommendation] || ''));
+      recoSec.appendChild(el('p', 'prose', t.rationale || ''));
+      card.appendChild(recoSec);
+
+      if(t.risks && t.risks.length){
+        var risksSec = el('div', 'sec');
+        risksSec.appendChild(el('p', 'sec-title', '<span class="bar"></span>تنبيهات'));
+        var risksList = el('div', 'ilist');
+        t.risks.forEach(function(r){
+          var row = el('div', 'irow');
+          row.appendChild(el('span', 'ic ic-warn', ICONS.warn));
+          row.appendChild(el('p', null, r));
+          risksList.appendChild(row);
+        });
+        risksSec.appendChild(risksList);
+        card.appendChild(risksSec);
+      }
+
+      tradeResults.appendChild(card);
+    });
+    tradeResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // تسجيل الـ Service Worker — شرط أساسي مشان كروم عالأندرويد يعرض تلقائياً
