@@ -124,6 +124,111 @@ LABEL_TEXT = {
     "5": "هاي صورة الفريم الأصغر (5 دقايق) — الزناد يلي بيحدد نقطة الدخول:",
 }
 
+# ===== وضع تحليل صفقة مفتوحة =====
+
+SYSTEM_PROMPT_TRADE = """أنت محلل فني متخصص بقراءة صفقات تداول مفتوحة من صور شاشة منصة تداول (مو تحليل
+دخول جديد، هاد لمتابعة صفقة موجودة أصلاً).
+
+بتوصلك صورة سكرين-شوت لشارت عليه صفقة مفتوحة وحدة أو أكتر، مرسومة كخطوط/صناديق سعر.
+
+قواعد قراءة الصورة:
+- كل صفقة مفتوحة بتظهر عادة بثلاث عناصر: خط/صندوق سعر الدخول (وجنبه الربح أو الخسارة
+  العائمة الحالية بالدولار وحجم الصفقة)، خط/صندوق وقف الخسارة، وخط/صندوق جني الربح (أو
+  حروف "TP" بدون رقم إذا ما كان محدد).
+- لون خط الصفقة بيدل على اتجاهها: أحمر = صفقة بيع، أزرق = صفقة شراء. إذا المنصة مستخدمة
+  ألوان أو تسميات تانية (متل كلمة SELL أو BUY مكتوبة صراحة)، اعتمد عليها.
+- **تجاهل تماماً** أي صندوق "شراء سريع/بيع سريع" بزاوية الشاشة (يلي فيه سعرين جنب بعض
+  وزر شراء وزر بيع) — هاد مش صفقة مفتوحة، هاد بس زر تنفيذ سريع. وأي رقم "سبريد" ظاهر
+  جنبه مش حجم صفقة، تجاهله كلياً.
+- الحجم الحقيقي للصفقة هو الرقم الصغير الظاهر جنب خط/صندوق الدخول نفسه (مثال: 0.5)، مش
+  أي رقم تاني بالشاشة.
+- إذا فيه أكتر من صفقة مفتوحة بنفس الصورة (أكتر من خط دخول)، حلل كل وحدة لحالها ورجعهم
+  كلهم بمصفوفة "trades".
+- إذا الستوب أو الهدف مش مرسوم إطلاقاً على الصفقة، خلي قيمته null بالـ JSON — لا تخترع
+  رقم.
+- "statusHeadline" جملة قصيرة توضح وضع الصفقة الحالي (رابحة/خاسرة، قريبة من الستوب أو
+  الهدف، ...).
+- "recommendation" لازم تكون وحدة بالضبط من: "hold" (استمر متل ما هي)،
+  "move_to_breakeven" (حرّك الستوب لنقطة الدخول)، "trail" (فعّل تريلنغ ستوب)،
+  "partial_close" (اقفل جزء من الصفقة)، "close" (اقفل الصفقة كاملة). اختار الأنسب بناءً
+  على قرب السعر الحالي من الستوب أو الهدف ومقدار الربح المتحقق لهلأ.
+- "rationale" اشرح سبب التوصية بوضوح.
+- "risks" أي تنبيهات إضافية (مثلاً الستوب قريب كتير، أو الصفقة عم تتحرك عكس الاتجاه
+  العام لو بان شي من الشارت). سيب المصفوفة فاضية إذا ما في تنبيهات.
+- ما تحسب مسافات أو نسب مخاطرة/عائد بنفسك — هاي بيحسبها النظام تلقائياً من الأرقام يلي
+  بترجعها.
+- اكتب كل النصوص بالعربي، والأرقام بالإنجليزي (لاتينية).
+- إذا الصورة مش شاشة تداول فيها صفقة مفتوحة واضحة أصلاً، رجّع فقط:
+  {"error": "وصف قصير للمشكلة بالعربي"}
+
+رجّع **JSON فقط** بدون أي نص قبله أو بعده وبدون code fences، بالضبط بهاد البنية:
+
+{
+  "trades": [
+    {
+      "symbol": "اسم الأداة متل ما هو ظاهر",
+      "direction": "buy" | "sell",
+      "directionLabel": "شراء" | "بيع",
+      "size": رقم أو null,
+      "entryPrice": رقم,
+      "currentPrice": رقم,
+      "stopLoss": رقم أو null,
+      "takeProfit": رقم أو null,
+      "floatingPnl": رقم أو null,
+      "statusHeadline": "...",
+      "recommendation": "hold" | "move_to_breakeven" | "trail" | "partial_close" | "close",
+      "recommendationLabel": "نص عربي قصير للتوصية",
+      "rationale": "...",
+      "risks": ["...", "..."]
+    }
+  ]
+}
+"""
+
+
+def _is_num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def augment_trade(trade: dict) -> dict:
+    """بيحسب المسافات ونسبة المخاطرة/العائد رياضياً بالكود — ما بنعتمد على حساب
+    النموذج اللغوي مشان الدقة (نفس فلسفة باقي المشروع: الأرقام محسوبة، مش مُخمّنة)."""
+    direction = trade.get("direction")
+    entry = trade.get("entryPrice")
+    current = trade.get("currentPrice")
+    stop = trade.get("stopLoss")
+    target = trade.get("takeProfit")
+
+    distance_to_stop = None
+    distance_to_target = None
+    risk_reward_now = None
+    pct_to_target = None
+
+    if direction in ("buy", "sell") and _is_num(entry) and _is_num(current):
+        if direction == "sell":
+            if _is_num(stop):
+                distance_to_stop = round(stop - current, 2)
+            if _is_num(target):
+                distance_to_target = round(current - target, 2)
+                if entry != target:
+                    pct_to_target = round((entry - current) / (entry - target) * 100, 1)
+        else:  # buy
+            if _is_num(stop):
+                distance_to_stop = round(current - stop, 2)
+            if _is_num(target):
+                distance_to_target = round(target - current, 2)
+                if target != entry:
+                    pct_to_target = round((current - entry) / (target - entry) * 100, 1)
+
+        if distance_to_stop is not None and distance_to_stop > 0 and distance_to_target is not None:
+            risk_reward_now = round(distance_to_target / distance_to_stop, 2)
+
+    trade["distanceToStop"] = distance_to_stop
+    trade["distanceToTarget"] = distance_to_target
+    trade["riskRewardNow"] = risk_reward_now
+    trade["pctToTarget"] = pct_to_target
+    return trade
+
 
 def extract_json(text: str) -> dict:
     text = text.strip()
@@ -240,6 +345,65 @@ def analyze():
         return jsonify(data), 422
 
     return jsonify(data)
+
+
+@app.route("/api/analyze-trade", methods=["POST"])
+def analyze_trade():
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify({"error": "مفتاح ANTHROPIC_API_KEY مش مضبوط. حط قيمته بملف .env وأعد تشغيل التطبيق."}), 500
+
+    file = request.files.get("image")
+    if not file or not file.filename:
+        return jsonify({"error": "لم يتم إرفاق صورة."}), 400
+
+    img_bytes = file.read()
+    if not img_bytes:
+        return jsonify({"error": "الملف فاضي."}), 400
+    if len(img_bytes) > MAX_BYTES:
+        return jsonify({"error": "حجم الصورة كبير — حاول تصغّرها لأقل من 5 ميغابايت."}), 400
+    media_type = file.mimetype or "image/png"
+    if media_type not in ALLOWED_MIME:
+        return jsonify({"error": "صيغة الصورة غير مدعومة. استخدم PNG أو JPEG أو WEBP."}), 400
+
+    # الاستيراد هون بيأخر ظهور خطأ "المفتاح مفقود" إذا الحزمة مش مثبتة أصلاً
+    from anthropic import Anthropic
+
+    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    b64 = base64.b64encode(img_bytes).decode("utf-8")
+
+    try:
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=3200,
+            system=SYSTEM_PROMPT_TRADE,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": media_type, "data": b64},
+                        },
+                        {
+                            "type": "text",
+                            "text": "حلل الصفقة (أو الصفقات) المفتوحة الظاهرة بالصورة واطلع لي JSON فقط حسب البنية المطلوبة بالضبط.",
+                        },
+                    ],
+                }
+            ],
+        )
+        raw_text = "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
+        data = extract_json(raw_text)
+    except json.JSONDecodeError:
+        return jsonify({"error": "الرد انقطع قبل ما يكمل — جرب مرة ثانية."}), 502
+    except Exception as exc:  # noqa: BLE001 — نرجع رسالة مفهومة للواجهة
+        return jsonify({"error": f"صار خطأ بالاتصال مع Claude API: {exc}"}), 502
+
+    if "error" in data and "trades" not in data:
+        return jsonify(data), 422
+
+    trades = [augment_trade(t) for t in data.get("trades", [])]
+    return jsonify({"trades": trades})
 
 
 if __name__ == "__main__":
