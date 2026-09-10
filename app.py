@@ -616,6 +616,24 @@ def analyze_live():
         )
     data["recommendations"] = merged_recs
 
+    # طبقة حماية إضافية: نتحقق بالكود (مو بالنموذج اللغوي) من نسبة العائد للمخاطرة
+    # الفعلية لكل توصية. لو طلعت أقل من 1:1 (يعني المخاطرة أكبر من العائد المحتمل)،
+    # نحط تحذير واضح وصريح بأول قائمة المخاطر — حتى لو صار خطأ حسابي ما توقعناه
+    # بالمستقبل، ما رح ينعرض كتوصية سليمة عادية من غير ما ينتبهلها المستخدم.
+    rr_warnings = []
+    for rec in merged_recs:
+        entry_v, stop_v, target_v = rec.get("entry"), rec.get("stop"), rec.get("target")
+        if _is_num(entry_v) and _is_num(stop_v) and _is_num(target_v):
+            risk = abs(entry_v - stop_v)
+            reward = abs(target_v - entry_v)
+            if risk > 0 and (reward / risk) < 1.0:
+                rr_warnings.append(
+                    f"⚠️ تنبيه: توصية \"{rec.get('term', '')}\" نسبة العائد للمخاطرة فيها أقل من 1:1 "
+                    f"(المخاطرة {round(risk, 2)} مقابل عائد محتمل {round(reward, 2)} بس) — إعداد غير منطقي، الأفضل تجاهلها."
+                )
+    if rr_warnings:
+        data["risks"] = rr_warnings + list(data.get("risks") or [])
+
     return jsonify(data)
 
 
