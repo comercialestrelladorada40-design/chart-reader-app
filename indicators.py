@@ -282,17 +282,28 @@ def analyze_multi_timeframe(candles_15m: list, candles_5m: list) -> dict:
     entry = current_price
     atr5 = frame5["atr"] if frame5["atr"] else current_price * 0.001
 
+    # أدنى نسبة عائد/مخاطرة مقبولة مشان نسمح بتقريب الهدف لأقرب دعم/مقاومة. لو
+    # تقريب الهدف لأقرب مستوى بيخلي العائد أصغر من المخاطرة (صفقة غير منطقية)،
+    # نتجاهل التقريب ونخلي الهدف على أساس ATR الخام (نفس فلسفة باقي المشروع: ما
+    # نعطي توصية بأرقام غير متوازنة حتى لو قريبة من مستوى فني ظاهر).
+    MIN_ACCEPTABLE_RR = 1.0
+
     def build_recommendation(term: str, atr_stop_mult: float, atr_target_mult: float):
         stop = entry - direction * atr_stop_mult * atr5
         target = entry + direction * atr_target_mult * atr5
+        risk = abs(entry - stop)
         if direction == 1 and resistance:
             nearer = min([r for r in resistance if r > entry], default=None)
             if nearer and nearer < target:
-                target = nearer
+                reward = abs(nearer - entry)
+                if risk > 0 and reward / risk >= MIN_ACCEPTABLE_RR:
+                    target = nearer
         if direction == -1 and support:
             nearer = max([s for s in support if s < entry], default=None)
             if nearer and nearer > target:
-                target = nearer
+                reward = abs(entry - nearer)
+                if risk > 0 and reward / risk >= MIN_ACCEPTABLE_RR:
+                    target = nearer
         return {"term": term, "entry": round(entry, 2), "stop": round(stop, 2), "target": round(target, 2)}
 
     recommendations = [
