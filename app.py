@@ -124,6 +124,111 @@ LABEL_TEXT = {
     "5": "هاي صورة الفريم الأصغر (5 دقايق) — الزناد يلي بيحدد نقطة الدخول:",
 }
 
+# ===== وضع التحليل المباشر (بيانات حية من Capital.com، بدون صور) =====
+
+SYSTEM_PROMPT_LIVE = f"""أنت محلل فني متخصص بتحليل الذهب (XAU/USD) باستخدام مؤشرات فنية محسوبة فعلياً
+من بيانات شموع حية (مو من صورة) — مجلوبة مباشرة من منصة التداول.
+
+بيوصلك وصف نصي فيه كل الأرقام والمؤشرات المحسوبة مسبقاً بالكود (SuperTrend, RSI, ATR,
+MACD, Bollinger Bands, التقلب التاريخي HV) لفريمين: الفريم الكبير (15 دقيقة — البوصلة
+يلي بتحدد الاتجاه العام) والفريم الصغير (5 دقايق — الزناد يلي بيحدد لحظة الدخول)، بالإضافة
+لنتيجة التوافق بين الفريمين وتوصيات محسوبة جاهزة (دخول/وقف/هدف).
+
+مهمتك الوحيدة: تكتب تحليل نصي احترافي بالعربي يشرح ويلخّص ويبرر هاي الأرقام — **بدون ما
+تغيّر ولا تخترع ولا تعدّل أي رقم من يلي انعطى لك**. كل الحقول الرقمية والبنيوية (الإشارة،
+قوة الاتجاه، الزخم، الدعم/المقاومة، نقاط الدخول/الوقف/الهدف) رح تنستبدل تلقائياً بالأرقام
+المحسوبة الحقيقية بعد ردك بغض النظر عمّا تكتبه — فركّز فقط على جودة الشرح والتحليل النصي.
+
+قواعد:
+- "alignmentNote" لازم يشرح بوضوح هل الفريمين (15 و5 دقايق) متوافقين على نفس الاتجاه
+  ولّا لأ، وليش، بالاستناد لأصوات المؤشرات المعطاة لك بكل فريم (SuperTrend/RSI/MACD/بولينجر).
+- "priceAction" فقرة تشرح وضع كل فريم: الاتجاه، الزخم، موقع السعر من بولينجر، مستوى
+  التقلب (ATR وHV).
+- "summary" ملخص شامل للحالة والقرار المقترح (دخول الآن / انتظار توافق الفريمين / محايد).
+- "strengths" و"risks" و"riskManagement" و"notes" استنتجهم من الأرقام المعطاة (مثلاً:
+  RSI قريب من تشبع شرائي/بيعي، HV مرتفع يعني حركة عنيفة محتملة، السعر عند حافة بولينجر،
+  إلخ). سيب أي مصفوفة فاضية إذا ما في نقاط فعلية.
+- "recommendations[].condition" و"recommendations[].rationale" نص فقط — الأرقام
+  (entry/stop/target) رح تُستبدل تلقائياً، بس اكتب condition وrationale منطقيين ومتوافقين
+  مع الأرقام المعطاة لك واتجاه التوصية.
+- "symbol" خليه "XAU/USD (الذهب)"، "symbolShort" خليه "Au"، "timeframe" خليه
+  "15 دقيقة + 5 دقايق (مباشر)".
+- اكتب كل النصوص بالعربي (باللهجة أو الفصحى الواضحة زي تقارير التداول)، والأرقام
+  بالإنجليزي (لاتينية).
+
+{JSON_SCHEMA_BLOCK}"""
+
+
+def build_live_prompt_text(computed: dict) -> str:
+    f15 = computed["frame15"]
+    f5 = computed["frame5"]
+
+    def frame_block(label, f):
+        return (
+            f"### فريم {label} دقيقة\n"
+            f"- السعر الحالي: {f['currentPrice']}\n"
+            f"- اتجاه SuperTrend: {f['trend']}\n"
+            f"- RSI(14): {f['rsi']}\n"
+            f"- ATR(14): {f['atr']} (تصنيف التقلب: {f['volatility']})\n"
+            f"- MACD histogram: {f['macdHistogram']}\n"
+            f"- بولينجر (20، 2 انحراف معياري): الوسط {f['bollingerMid']} — العلوي "
+            f"{f['bollingerUpper']} — السفلي {f['bollingerLower']}\n"
+            f"- التقلب التاريخي السنوي HV: {f['hv']}%\n"
+            f"- الدعم القريب: {f['support']} / المقاومة القريبة: {f['resistance']}\n"
+            f"- تصويت المؤشرات: {f['buyVotes']} مع الشراء، {f['sellVotes']} مع البيع "
+            f"(من أصل {f['totalIndicators']}) → إشارة الفريم: {f['signalLabel']}\n"
+            f"- عدد الشموع المستخدمة: {f['candleCount']}\n"
+        )
+
+    align_txt = "متوافقين على نفس الاتجاه" if computed["aligned"] else "غير متوافقين (أو أحدهما/كلاهما محايد)"
+    recs_txt = "\n".join(
+        f"  - {r['term']}: دخول {r['entry']} — وقف {r['stop']} — هدف {r['target']}"
+        for r in computed["recommendations"]
+    )
+
+    return (
+        frame_block("15", f15)
+        + "\n"
+        + frame_block("5", f5)
+        + "\n"
+        + "### النتيجة المجمّعة بعد مقارنة الفريمين\n"
+        + f"- حالة التوافق بين الفريمين: {align_txt}\n"
+        + f"- الإشارة النهائية: {computed['signalLabel']}\n"
+        + f"- قوة الاتجاه المحسوبة: {computed['trendStrength']}/100\n"
+        + f"- الزخم المحسوب: {computed['momentum']}/100\n"
+        + f"- التقلب العام: {computed['volatility']}\n"
+        + f"- الدعم المدمج: {computed['support']} / المقاومة المدمجة: {computed['resistance']}\n"
+        + "- التوصيات المحسوبة (الأرقام نهائية، لا تغيّرها):\n"
+        + recs_txt
+        + "\n\nاكتب الآن التحليل الكامل بصيغة JSON حسب البنية المطلوبة بالضبط، بالاعتماد "
+        + "فقط على الأرقام أعلاه."
+    )
+
+
+_capital_client = None
+_gold_epic = None
+
+
+def get_capital_client():
+    global _capital_client
+    if _capital_client is None:
+        from capital_client import CapitalClient
+
+        api_key = os.environ.get("CAPITAL_API_KEY")
+        identifier = os.environ.get("CAPITAL_IDENTIFIER")
+        password = os.environ.get("CAPITAL_PASSWORD")
+        demo = os.environ.get("CAPITAL_DEMO", "true").strip().lower() not in ("false", "0", "no")
+        _capital_client = CapitalClient(api_key, identifier, password, demo=demo)
+    return _capital_client
+
+
+def get_gold_epic(client) -> str:
+    global _gold_epic
+    if _gold_epic is None:
+        _gold_epic = client.resolve_gold_epic()
+    return _gold_epic
+
+
 # ===== وضع تحليل صفقة مفتوحة =====
 
 SYSTEM_PROMPT_TRADE = """أنت محلل فني متخصص بقراءة صفقات تداول مفتوحة من صور شاشة منصة تداول (مو تحليل
@@ -423,6 +528,95 @@ def analyze_trade():
 
     trades = [augment_trade(t) for t in data.get("trades", [])]
     return jsonify({"trades": trades})
+
+
+@app.route("/api/analyze-live", methods=["POST"])
+def analyze_live():
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify({"error": "مفتاح ANTHROPIC_API_KEY مش مضبوط. حط قيمته بملف .env وأعد تشغيل التطبيق."}), 500
+
+    if not (os.environ.get("CAPITAL_API_KEY") and os.environ.get("CAPITAL_IDENTIFIER") and os.environ.get("CAPITAL_PASSWORD")):
+        return (
+            jsonify(
+                {
+                    "error": "بيانات اعتماد Capital.com مش مضبوطة على السيرفر (CAPITAL_API_KEY / "
+                    "CAPITAL_IDENTIFIER / CAPITAL_PASSWORD). أضفهم من إعدادات Render (Environment) وأعد التشغيل."
+                }
+            ),
+            500,
+        )
+
+    from capital_client import CapitalAPIError
+    import indicators
+
+    try:
+        client = get_capital_client()
+        epic = get_gold_epic(client)
+        candles_15m = client.get_prices(epic, resolution="MINUTE_15", max_points=120)
+        candles_5m = client.get_prices(epic, resolution="MINUTE_5", max_points=120)
+        computed = indicators.analyze_multi_timeframe(candles_15m, candles_5m)
+    except CapitalAPIError as exc:
+        return jsonify({"error": f"صار خطأ بجلب بيانات Capital.com: {exc}"}), 502
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001 — نرجع رسالة مفهومة للواجهة
+        return jsonify({"error": f"صار خطأ غير متوقع بجلب أو حساب البيانات: {exc}"}), 502
+
+    prompt_text = build_live_prompt_text(computed)
+
+    # الاستيراد هون بيأخر ظهور خطأ "المفتاح مفقود" إذا الحزمة مش مثبتة أصلاً
+    from anthropic import Anthropic
+
+    client_ai = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+    try:
+        response = client_ai.messages.create(
+            model=MODEL,
+            max_tokens=3000,
+            system=SYSTEM_PROMPT_LIVE,
+            messages=[{"role": "user", "content": prompt_text}],
+        )
+        raw_text = "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
+        data = extract_json(raw_text)
+    except json.JSONDecodeError:
+        return jsonify({"error": "الرد انقطع قبل ما يكمل — جرب مرة ثانية."}), 502
+    except Exception as exc:  # noqa: BLE001 — نرجع رسالة مفهومة للواجهة
+        return jsonify({"error": f"صار خطأ بالاتصال مع Claude API: {exc}"}), 502
+
+    if "error" in data and len(data) == 1:
+        return jsonify(data), 422
+
+    # فرض الأرقام المحسوبة فعلياً بالكود — نفس فلسفة المشروع بكل الأوضاع: النموذج
+    # اللغوي بيكتب نص بس، الأرقام والبنية دايماً من الحساب الحقيقي.
+    data["symbol"] = "XAU/USD (الذهب)"
+    data["symbolShort"] = "Au"
+    data["timeframe"] = "15 دقيقة + 5 دقايق (مباشر)"
+    data["signal"] = computed["signal"]
+    data["signalLabel"] = computed["signalLabel"]
+    data["trendStrength"] = computed["trendStrength"]
+    data["momentum"] = computed["momentum"]
+    data["volatility"] = computed["volatility"]
+    data["support"] = computed["support"]
+    data["resistance"] = computed["resistance"]
+
+    computed_recs = computed["recommendations"]
+    model_recs = data.get("recommendations") or []
+    merged_recs = []
+    for i, crec in enumerate(computed_recs):
+        mrec = model_recs[i] if i < len(model_recs) else {}
+        merged_recs.append(
+            {
+                "term": crec["term"],
+                "condition": mrec.get("condition", ""),
+                "entry": crec["entry"],
+                "stop": crec["stop"],
+                "target": crec["target"],
+                "rationale": mrec.get("rationale", ""),
+            }
+        )
+    data["recommendations"] = merged_recs
+
+    return jsonify(data)
 
 
 if __name__ == "__main__":
