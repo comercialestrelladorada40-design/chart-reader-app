@@ -254,6 +254,7 @@
   <div class="tabs">
     <button class="tab-btn active" id="tabEntryBtn" type="button">تحليل الدخول</button>
     <button class="tab-btn" id="tabTradeBtn" type="button">تحليل صفقة مفتوحة</button>
+    <button class="tab-btn" id="tabLiveBtn" type="button">تحليل مباشر</button>
   </div>
 
   <div class="mode-panel active" id="modeEntry">
@@ -396,9 +397,90 @@
     <div id="tradeResults"></div>
   </div>
 
+  <div class="mode-panel" id="modeLive">
+  <div class="panel">
+    <p class="upload-note" style="margin-top:0;">بيجيب بيانات شموع حية لفريم 15 و5 دقايق مباشرة من Capital.com، وبيحسب
+      SuperTrend وRSI وATR وMACD وبولينجر باندز والتقلب التاريخي فعلياً بالكود (مش تقدير بصري)، وبيبني تقرير على أساس
+      توافق المؤشرات بين الفريمين. ما بيحتاج رفع أي صورة.</p>
+    <div class="actions">
+      <button class="btn btn-primary" id="analyzeLiveBtn" type="button">
+        <span id="analyzeLiveLabel">حلّل الآن</span>
+      </button>
+    </div>
+    <div class="error-box" id="errorBoxLive"></div>
+  </div>
+
+  <div class="card" id="cardLive">
+    <div class="head">
+      <div class="avatar" id="avatarLive"></div>
+      <div class="head-text">
+        <p class="symbol" id="symbolLive"></p>
+        <span class="tf" id="tfLive"></span>
+      </div>
+      <span class="signal-pill" id="signalPillLive"></span>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>مؤشرات القراءة</p>
+      <div class="gauges">
+        <div class="gauge-row">
+          <span class="gauge-label">قوة الاتجاه</span>
+          <div class="gauge-track"><div class="gauge-fill" id="trendFillLive"></div></div>
+          <span class="gauge-val" id="trendValLive"></span>
+        </div>
+        <div class="gauge-row">
+          <span class="gauge-label">الزخم</span>
+          <div class="gauge-track"><div class="gauge-fill" id="momFillLive"></div></div>
+          <span class="gauge-val" id="momValLive"></span>
+        </div>
+        <div class="vol-row">
+          <span class="vol-label">التقلّب</span>
+          <span class="vol-pill" id="volValLive"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>حركة السعر</p>
+      <p class="prose" id="priceActionLive"></p>
+    </div>
+
+    <div class="sec" id="alignmentSecLive">
+      <p class="sec-title"><span class="bar"></span>المواءمة بين الفريمين</p>
+      <div class="align-box" id="alignmentBoxLive"></div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>الدعم والمقاومة</p>
+      <div class="levels">
+        <div class="levels-col"><h3>دعم</h3><div class="chip-row" id="supportChipsLive"></div></div>
+        <div class="levels-col"><h3>مقاومة</h3><div class="chip-row" id="resistanceChipsLive"></div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>التوصيات</p>
+      <div id="recListLive"></div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-title"><span class="bar"></span>الملخص</p>
+      <div class="summary-box" id="summaryBoxLive"></div>
+    </div>
+
+    <div class="sec">
+      <div class="subblock"><p class="subhead">نقاط القوة</p><div class="ilist" id="strengthsListLive"></div></div>
+      <div class="subblock"><p class="subhead">المخاطر</p><div class="ilist" id="risksListLive"></div></div>
+      <div class="subblock"><p class="subhead">إدارة المخاطر</p><div class="ilist" id="mgmtListLive"></div></div>
+      <div class="subblock"><p class="subhead">نقاط إضافية</p><div class="ilist" id="notesListLive"></div></div>
+    </div>
+  </div>
+  </div>
+
   <p class="foot">
-    <b>ملاحظة:</b> التحليل ناتج عن قراءة بصرية لصورة (أو صورتين) الشارت بواسطة Claude، مش من بيانات سعر حية أو حسابات مؤشرات دقيقة —
-    ممكن تختلف الأرقام عن الواقع. مش توصية استثمارية، وما بيغني عن التأكد من مصدر بيانات حقيقي قبل أي قرار تداول.
+    <b>ملاحظة:</b> تبويبا "تحليل الدخول" و"تحليل صفقة مفتوحة" بيعتمدوا على قراءة بصرية لصورة (أو صورتين) الشارت بواسطة
+    Claude، وممكن تختلف الأرقام فيهم شوي عن الواقع. تبويب "تحليل مباشر" بيعتمد على بيانات شموع حية ومؤشرات محسوبة فعلياً
+    بالكود من Capital.com. بكل الأحوال هاد مش توصية استثمارية، وما بيغني عن قرارك ومتابعتك الخاصة قبل أي صفقة.
   </p>
 </div>
 
@@ -546,29 +628,34 @@
   }
   function clearChildren(node){ while(node.firstChild) node.removeChild(node.firstChild); }
 
-  function render(d){
-    document.getElementById('symbol').textContent = d.symbol || '—';
-    document.getElementById('tf').textContent = 'فريم ' + (d.timeframe || '—');
-    document.getElementById('avatar').textContent = d.symbolShort || (d.symbol ? d.symbol[0] : '?');
+  // suf: لاحقة أسماء العناصر — فاضية لبطاقة تحليل الدخول، أو 'Live' لبطاقة التحليل
+  // المباشر — نفس بنية البطاقة ونفس بنية بيانات الرد (JSON_SCHEMA_BLOCK) مشتركة
+  // بين الوضعين، فبنعيد استخدام نفس منطق العرض بدل ما نكرره.
+  function renderCard(d, suf){
+    function byId(id){ return document.getElementById(id + suf); }
 
-    var pill = document.getElementById('signalPill');
+    byId('symbol').textContent = d.symbol || '—';
+    byId('tf').textContent = 'فريم ' + (d.timeframe || '—');
+    byId('avatar').textContent = d.symbolShort || (d.symbol ? d.symbol[0] : '?');
+
+    var pill = byId('signalPill');
     pill.textContent = d.signalLabel || '—';
     pill.className = 'signal-pill signal-' + (d.signal || 'neutral');
 
     var trend = Number(d.trendStrength) || 0;
     var mom = Number(d.momentum) || 0;
-    document.getElementById('trendFill').style.width = trend + '%';
-    document.getElementById('trendVal').textContent = trend;
-    document.getElementById('momFill').style.width = mom + '%';
-    document.getElementById('momVal').textContent = mom;
-    document.getElementById('volVal').textContent = d.volatility || '—';
+    byId('trendFill').style.width = trend + '%';
+    byId('trendVal').textContent = trend;
+    byId('momFill').style.width = mom + '%';
+    byId('momVal').textContent = mom;
+    byId('volVal').textContent = d.volatility || '—';
 
-    document.getElementById('priceAction').textContent = d.priceAction || '';
-    document.getElementById('summaryBox').textContent = d.summary || '';
+    byId('priceAction').textContent = d.priceAction || '';
+    byId('summaryBox').textContent = d.summary || '';
 
-    var alignSec = document.getElementById('alignmentSec');
+    var alignSec = byId('alignmentSec');
     if(d.alignmentNote){
-      var alignBox = document.getElementById('alignmentBox');
+      var alignBox = byId('alignmentBox');
       alignBox.textContent = d.alignmentNote;
       alignBox.className = 'align-box ' + (d.signal === 'neutral' ? 'align-bad' : 'align-ok');
       alignSec.style.display = '';
@@ -576,16 +663,16 @@
       alignSec.style.display = 'none';
     }
 
-    var supWrap = document.getElementById('supportChips'); clearChildren(supWrap);
+    var supWrap = byId('supportChips'); clearChildren(supWrap);
     (d.support || []).slice().sort(function(a,b){return b-a;}).forEach(function(v){
       supWrap.appendChild(el('span', 'chip chip-support', fmt(v)));
     });
-    var resWrap = document.getElementById('resistanceChips'); clearChildren(resWrap);
+    var resWrap = byId('resistanceChips'); clearChildren(resWrap);
     (d.resistance || []).slice().sort(function(a,b){return a-b;}).forEach(function(v){
       resWrap.appendChild(el('span', 'chip chip-resistance', fmt(v)));
     });
 
-    var recWrap = document.getElementById('recList'); clearChildren(recWrap);
+    var recWrap = byId('recList'); clearChildren(recWrap);
     (d.recommendations || []).forEach(function(r){
       var c = el('div', 'rec');
       c.appendChild(el('div', 'rec-head',
@@ -603,7 +690,7 @@
     });
 
     function fillList(id, items, iconClass, icon){
-      var wrap = document.getElementById(id); clearChildren(wrap);
+      var wrap = document.getElementById(id + suf); clearChildren(wrap);
       (items || []).forEach(function(t){
         var row = el('div', 'irow');
         row.appendChild(el('span', 'ic ' + iconClass, icon));
@@ -617,23 +704,30 @@
     fillList('notesList', d.notes, 'ic-info', ICONS.info);
   }
 
-  // ===== تبديل التبويبات (تحليل الدخول / تحليل صفقة مفتوحة) =====
+  function render(d){ renderCard(d, ''); }
+
+  // ===== تبديل التبويبات (تحليل الدخول / تحليل صفقة مفتوحة / تحليل مباشر) =====
   var tabEntryBtn = document.getElementById('tabEntryBtn');
   var tabTradeBtn = document.getElementById('tabTradeBtn');
+  var tabLiveBtn = document.getElementById('tabLiveBtn');
   var modeEntry = document.getElementById('modeEntry');
   var modeTrade = document.getElementById('modeTrade');
+  var modeLive = document.getElementById('modeLive');
 
-  tabEntryBtn.addEventListener('click', function(){
-    tabEntryBtn.classList.add('active');
-    tabTradeBtn.classList.remove('active');
-    modeEntry.classList.add('active');
-    modeTrade.classList.remove('active');
-  });
-  tabTradeBtn.addEventListener('click', function(){
-    tabTradeBtn.classList.add('active');
-    tabEntryBtn.classList.remove('active');
-    modeTrade.classList.add('active');
-    modeEntry.classList.remove('active');
+  var allTabs = [
+    { btn: tabEntryBtn, panel: modeEntry },
+    { btn: tabTradeBtn, panel: modeTrade },
+    { btn: tabLiveBtn, panel: modeLive }
+  ];
+  function activateTab(target){
+    allTabs.forEach(function(t){
+      var active = t === target;
+      t.btn.classList.toggle('active', active);
+      t.panel.classList.toggle('active', active);
+    });
+  }
+  allTabs.forEach(function(t){
+    t.btn.addEventListener('click', function(){ activateTab(t); });
   });
 
   // ===== وضع تحليل الصفقة المفتوحة =====
@@ -804,6 +898,47 @@
     });
     tradeResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // ===== وضع التحليل المباشر (بيانات حية من Capital.com، بدون صور) =====
+  var analyzeLiveBtn = document.getElementById('analyzeLiveBtn');
+  var analyzeLiveLabel = document.getElementById('analyzeLiveLabel');
+  var errorBoxLive = document.getElementById('errorBoxLive');
+  var cardLive = document.getElementById('cardLive');
+
+  function showLiveError(msg){
+    errorBoxLive.textContent = msg;
+    errorBoxLive.classList.add('show');
+  }
+  function clearLiveError(){
+    errorBoxLive.classList.remove('show');
+    errorBoxLive.textContent = '';
+  }
+
+  analyzeLiveBtn.addEventListener('click', function(){
+    clearLiveError();
+    cardLive.classList.remove('show');
+    analyzeLiveBtn.disabled = true;
+    analyzeLiveLabel.innerHTML = '<span class="spinner"></span> عم يجيب البيانات ويحلل...';
+
+    fetch('/api/analyze-live', { method: 'POST' })
+      .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
+      .then(function(result){
+        if(!result.ok || result.data.error){
+          showLiveError(result.data.error || 'صار في مشكلة، جرب مرة ثانية.');
+          return;
+        }
+        renderCard(result.data, 'Live');
+        cardLive.classList.add('show');
+        cardLive.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      })
+      .catch(function(){
+        showLiveError('ما قدرنا نوصل للسيرفر — تأكد إنه التطبيق شغال.');
+      })
+      .finally(function(){
+        analyzeLiveBtn.disabled = false;
+        analyzeLiveLabel.textContent = 'حلّل الآن';
+      });
+  });
 
   // تسجيل الـ Service Worker — شرط أساسي مشان كروم عالأندرويد يعرض تلقائياً
   // خيار "تثبيت التطبيق" (نافذة مستقلة + أيقونة عالشاشة الرئيسية).
