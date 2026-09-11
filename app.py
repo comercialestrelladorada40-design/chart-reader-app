@@ -18,6 +18,7 @@ import base64
 import json
 import os
 import re
+import time
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
@@ -635,6 +636,99 @@ def analyze_live():
         data["risks"] = rr_warnings + list(data.get("risks") or [])
 
     return jsonify(data)
+
+
+# ===== وضع التنبيهات التلقائية (فحص دوري + إرسال توصية على تلغرام) =====
+
+# حالة بسيطة بالذاكرة (مش قاعدة بيانات) مشان ما نبعت نفس التنبيه كل شوي طول ما
+# الإشارة نفسها مستمرة. بما إنه الفحص الدوري (كل 5-10 دقايق) بيخلي الخدمة
+# مستيقظة باستمرار، الحالة هاي بتضل محفوظة بالذاكرة طول ما الخدمة شغالة.
+_alert_state = {"direction": None, "last_alert_time": 0.0, "entry": None}
+ALERT_COOLDOWN_SECONDS = 60 * 60  # ما نعيد نفس التنبيه بنفس الاتجاه أقل من ساعة
+
+
+def send_telegram_message(text: str) -> None:
+    import requests
+
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
+    resp = requests.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+        timeout=20,
+    )
+    if resp.status_code != 200:
+        raise RuntimeError(f"فشل إرسال رسالة تلغرام (HTTP {resp.status_code}): {resp.text[:300]}")
+
+
+def build_alert_message(computed: dict) -> str:
+    rec = computed["recommendations"][0]  # التوصية قصيرة المدى — الأنسب لتنبيه فوري
+    direction_label = computed["signalLabel"]
+    risk = abs(rec["entry"] - rec["stop"])
+    reward = abs(rec["target"] - rec["entry"])
+    rr = round(reward / risk, 2) if risk else 0
+    return (
+        f"🔔 <b>تنبيه دخول جديد — XAU/USD (الذهب)</b>\n\n"
+        f"الاتجاه: <b>{direction_label}</b>\n"
+        f"السعر الحالي: {computed['currentPrice']}\n\n"
+        f"الدخول: {rec['entry']}\n"
+        f"وقف الخسارة: {rec['stop']}\n"
+        f"جني الربح: {rec['target']}\n"
+        f"نسبة العائد/المخاطرة: {rr}\n\n"
+        f"قوة الاتجاه: {computed['trendStrength']}/100 — الفريمين (15 و5 دقايق) متوافقين.\n"
+        f"⚠️ تنبيه آلي بناءً على مؤشرات محسوبة — تأكد بنفسك قبل أي قرار."
+    )
+
+
+@app.route("/api/check-alert", methods=["GET", "POST"])
+def check_alert():
+    expected_secret = os.environ.get("ALERT_CHECK_SECRET")
+    if not expected_secret:
+        return jsonify({"error": "ALERT_CHECK_SECRET مش مضبوط على السيرفر."}), 500
+    if request.args.get("key") != expected_secret:
+        return jsonify({"error": "مفتاح غير صحيح."}), 403
+
+    if not (os.environ.get("CAPITAL_API_KEY") and os.environ.get("CAPITAL_IDENTIFIER") and os.environ.get("CAPITAL_PASSWORD")):
+        return jsonify({"error": "بيانات اعتماد Capital.com مش مضبوطة."}), 500
+    if not (os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")):
+        return jsonify({"error": "بيانات تلغرام (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID) مش مضبوطة."}), 500
+
+    from capital_client import CapitalAPIError
+    import indicators
+
+    try:
+        client = get_capital_client()
+        epic = get_gold_epic(client)
+        candles_15m = client.get_prices(epic, resolution="MINUTE_15", max_points=120)
+        candles_5m = client.get_prices(epic, resolution="MINUTE_5", max_points=120)
+        computed = indicators.analyze_multi_timeframe(candles_15m, candles_5m)
+    except (CapitalAPIError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 502
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"صار خطأ غير متوقع: {exc}"}), 502
+
+    is_strong_signal = computed["aligned"] and computed["signal"] != "neutral"
+    if not is_strong_signal:
+        return jsonify({"alerted": False, "reason": "لا يوجد توافق حالياً بين الفريمين", "signal": computed["signal"]})
+
+    now = time.time()
+    same_direction_recent = (
+        _alert_state["direction"] == computed["signal"]
+        and (now - _alert_state["last_alert_time"]) < ALERT_COOLDOWN_SECONDS
+    )
+    if same_direction_recent:
+        return jsonify({"alerted": False, "reason": "نفس الإشارة اتبعتت مؤخراً (ضمن فترة الانتظار)", "signal": computed["signal"]})
+
+    try:
+        send_telegram_message(build_alert_message(computed))
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"فشل إرسال التنبيه: {exc}"}), 502
+
+    _alert_state["direction"] = computed["signal"]
+    _alert_state["last_alert_time"] = now
+    _alert_state["entry"] = computed["recommendations"][0]["entry"]
+
+    return jsonify({"alerted": True, "signal": computed["signal"], "entry": _alert_state["entry"]})
 
 
 if __name__ == "__main__":
