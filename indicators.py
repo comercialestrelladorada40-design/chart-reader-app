@@ -281,6 +281,7 @@ def analyze_multi_timeframe(candles_15m: list, candles_5m: list) -> dict:
 
     entry = current_price
     atr5 = frame5["atr"] if frame5["atr"] else current_price * 0.001
+    atr5 = max(atr5, 3.0)
 
     # أدنى نسبة عائد/مخاطرة مقبولة مشان نسمح بتقريب الهدف لأقرب دعم/مقاومة. لو
     # تقريب الهدف لأقرب مستوى بيخلي العائد أصغر من المخاطرة (صفقة غير منطقية)،
