@@ -573,7 +573,7 @@ def analyze_live():
     try:
         response = client_ai.messages.create(
             model=MODEL,
-            max_tokens=3000,
+            max_tokens=8000,
             system=SYSTEM_PROMPT_LIVE,
             messages=[{"role": "user", "content": prompt_text}],
         )
@@ -716,7 +716,8 @@ def check_alert():
         _alert_state["direction"] == computed["signal"]
         and (now - _alert_state["last_alert_time"]) < ALERT_COOLDOWN_SECONDS
     )
-    if same_direction_recent:
+    price_unchanged = _alert_state["entry"] == computed["recommendations"][0]["entry"]
+    if same_direction_recent or price_unchanged:
         return jsonify({"alerted": False, "reason": "نفس الإشارة اتبعتت مؤخراً (ضمن فترة الانتظار)", "signal": computed["signal"]})
 
     try:
