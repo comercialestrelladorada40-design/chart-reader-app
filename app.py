@@ -28,6 +28,7 @@ load_dotenv()
 app = Flask(__name__, static_folder="static", static_url_path="")
 
 MODEL = os.environ.get("CHART_READER_MODEL", "claude-sonnet-4-5-20250929")
+LIVE_MODEL = os.environ.get("CHART_READER_LIVE_MODEL", "claude-haiku-4-5-20251001")
 ALLOWED_MIME = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 MAX_BYTES = 5 * 1024 * 1024  # حد أقصى تقريبي لحجم كل صورة يقبله الـ API
 
@@ -156,6 +157,8 @@ MACD, Bollinger Bands, التقلب التاريخي HV) لفريمين: الف�
   "15 دقيقة + 5 دقايق (مباشر)".
 - اكتب كل النصوص بالعربي (باللهجة أو الفصحى الواضحة زي تقارير التداول)، والأرقام
   بالإنجليزي (لاتينية).
+
+- BREVITY IS CRITICAL (this reply must be generated fast): write every text field in 1-2 short sentences at most; strengths and risks at most 3 short items each; leave notes and riskManagement as empty arrays unless a point is truly essential; never repeat the same point in two fields.
 
 {JSON_SCHEMA_BLOCK}"""
 
@@ -572,7 +575,7 @@ def analyze_live():
 
     try:
         response = client_ai.messages.create(
-            model=MODEL,
+            model=LIVE_MODEL,
             max_tokens=8000,
             system=SYSTEM_PROMPT_LIVE,
             messages=[{"role": "user", "content": prompt_text}],
