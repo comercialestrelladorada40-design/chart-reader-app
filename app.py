@@ -19,6 +19,7 @@ import json
 import os
 import re
 import time
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
@@ -592,6 +593,17 @@ def analyze_live():
 
     # فرض الأرقام المحسوبة فعلياً بالكود — نفس فلسفة المشروع بكل الأوضاع: النموذج
     # اللغوي بيكتب نص بس، الأرقام والبنية دايماً من الحساب الحقيقي.
+    live_note = None
+    try:
+        latest = client.get_prices(epic, resolution="MINUTE", max_points=2)
+        price_now = latest[-1]["close"]
+        moved = round(price_now - computed["currentPrice"], 2)
+        if abs(moved) >= max(2.0, 0.5 * computed["frame5"]["atr"]):
+            live_note = f"⚠️ السعر تحرك {moved} نقطة منذ بداية التحليل (السعر الآن {price_now}) — الأرقام محسوبة بسعر بداية التحليل، راجع السعر قبل أي دخول."
+    except Exception:
+        live_note = None
+    if live_note:
+        data["risks"] = [live_note] + list(data.get("risks") or [])
     data["symbol"] = "XAU/USD (الذهب)"
     data["symbolShort"] = "Au"
     data["timeframe"] = "15 دقيقة + 5 دقايق (مباشر)"
@@ -650,6 +662,35 @@ _alert_state = {"direction": None, "last_alert_time": 0.0, "entry": None}
 ALERT_COOLDOWN_SECONDS = 60 * 60  # ما نعيد نفس التنبيه بنفس الاتجاه أقل من ساعة
 
 
+def _us_eastern_offset_hours(utc_dt):
+    y = utc_dt.year
+    start = datetime(y, 3, 8, 7, 0)
+    while start.weekday() != 6:
+        start += timedelta(days=1)
+    end = datetime(y, 11, 1, 6, 0)
+    while end.weekday() != 6:
+        end += timedelta(days=1)
+    return -4 if start <= utc_dt < end else -5
+
+
+def market_closed_now():
+    now = datetime.utcnow()
+    et = now + timedelta(hours=_us_eastern_offset_hours(now))
+    wd, h = et.weekday(), et.hour + et.minute / 60.0
+    return wd == 5 or (wd == 4 and h >= 17) or (wd == 6 and h < 18) or (17 <= h < 18)
+
+
+def wide_setup_text(computed):
+    w = computed.get("wideSetup")
+    if not w:
+        return ""
+    return (
+        "\U0001F4CC نسخة بعيدة المدى (صفقة لعدة ساعات):\n"
+        f"وقف بعيد: {w['stop']}\n"
+        f"هدف بعيد: {w['target']}\n\n"
+    )
+
+
 def send_telegram_message(text: str) -> None:
     import requests
 
@@ -678,6 +719,7 @@ def build_alert_message(computed: dict) -> str:
         f"وقف الخسارة: {rec['stop']}\n"
         f"جني الربح: {rec['target']}\n"
         f"نسبة العائد/المخاطرة: {rr}\n\n"
+        f"{wide_setup_text(computed)}"
         f"قوة الاتجاه: {computed['trendStrength']}/100 — الفريمين (15 و5 دقايق) متوافقين.\n"
         f"⚠️ تنبيه آلي بناءً على مؤشرات محسوبة — تأكد بنفسك قبل أي قرار."
     )
@@ -693,6 +735,8 @@ def check_alert():
 
     if not (os.environ.get("CAPITAL_API_KEY") and os.environ.get("CAPITAL_IDENTIFIER") and os.environ.get("CAPITAL_PASSWORD")):
         return jsonify({"error": "بيانات اعتماد Capital.com مش مضبوطة."}), 500
+    if market_closed_now():
+        return jsonify({"alerted": False, "reason": "market closed (weekend or daily break)"})
     if not (os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")):
         return jsonify({"error": "بيانات تلغرام (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID) مش مضبوطة."}), 500
 
