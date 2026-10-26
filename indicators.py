@@ -323,6 +323,8 @@ def analyze_multi_timeframe(candles_15m: list, candles_5m: list) -> dict:
         "resistance": resistance,
         "aligned": aligned,
         "recommendations": recommendations,
+        "atr5": round(atr5, 3),
+        "wideSetup": {"entry": round(entry, 2), "stop": round(entry - direction * 4.0 * atr5, 2), "target": round(entry + direction * 10.0 * atr5, 2)},
         "frame15": frame15,
         "frame5": frame5,
     }
